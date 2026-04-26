@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# FILE:         configure_wifi_priority.sh
+# AUTHOR:       Ella Moody <moodyellam@gmail.com>
+# CREATED:      04-25-2026
+# LAST EDITED:  04-25-2026
+# DESCRIPTION:  This script is intended to 1. configure the wifi network priority of
+#               the onboard computer to prefer Team_## and eduroam second. Then, 2. 
+#               create a daemon that, if on eduroam, checks every interval to see
+#               if Team_## is available and connect to that instead. This script
+#               requires that the computer has already connected to both and has the
+#               user/password saved. This script will need to be manually edited and
+#               ran again if the SSID of the network changes.
+# USAGE:        sudo ./configure_wifi_priority.sh
+# DEPENDS:      bash, sudo
+# LICENSE:      Apache 2.0
+# -----------------------------------------------------------------------------
+
+set -euo pipefail
+
+PRIMARY_SSID="Team_##"
+SECONDARY_SSID="eduroam"
+CHECK_INTERVAL=60
+
+# Script needs to run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "[ERROR] Please run this script as root: sudo bash setup-wifi-priority.sh"
+  exit 1
+fi
+
+
+# Part 1. update the NetworkManager priorities
+echo "[OK] Updating NetworkManager Priorities to favor team SSID..."
+if nmcli connection show | grep -q "$PRIMARY_SSID"; then
+    nmcli connection modify "$PRIMARY_SSID" connection.autoconnect yes connection.autoconnect-priority 100
+    echo "[OK] Set $PRIMARY_SSID priority to 100"
+else
+    echo "[WARNING] Connection profile for $PRIMARY_SSID not found. Please connect to it manually first."
+fi
+
+
+
+# Part 2. write the daemon script that will run in the background
+echo "[OK] Creating the daemon script..."
+MONITOR_SCRIPT="/usr/local/bin/wifi-priority-monitor.sh"
+
+
+# Literally write a whole other script in this script it's getting funky
+cat << 'EOF' > "$MONITOR_SCRIPT"
+#!/bin/bash
+
+PRIMARY="REPLACE_PRIMARY"
+INTERVAL=REPLACE_INTERVAL
+
+while true; do
+    # Get the name of the currently active Wi-Fi connection
+    ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1)
+
+    # If we are NOT connected to the primary network...
+    if [ "$ACTIVE_CONNECTION" != "$PRIMARY" ]; then
+        # Force a Wi-Fi scan and check if the primary network is in range
+        if nmcli -t -f ssid dev wifi list --rescan yes | grep -q "^${PRIMARY}$"; then
+            echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
+            nmcli connection up "$PRIMARY"
+        fi
+    fi
+    sleep $INTERVAL
+done
+EOF
+
+# Inject variables into the daemon script
+sed -i "s/REPLACE_PRIMARY/$PRIMARY_SSID/g" "$MONITOR_SCRIPT"
+sed -i "s/REPLACE_INTERVAL/$CHECK_INTERVAL/g" "$MONITOR_SCRIPT"
+chmod +x "$MONITOR_SCRIPT"
+echo "[OK] Daemon script created at $MONITOR_SCRIPT"
+
+
+# Turn this whole other monitor script into a daemon service
+echo "[OK] Turning script in Daemon..."
+SERVICE_FILE="/etc/systemd/system/wifi-priority-monitor.service"
+
+
+cat << EOF > "$SERVICE_FILE"
+[Unit]
+Description=Continuous WiFi Priority Monitor
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=$MONITOR_SCRIPT
+Restart=on-failure
+RestartSec=10
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "[OK] Systemd service created."
+
+
+# Start service now
+echo "[OK] Starting the Daemon service..."
+systemctl daemon-reload
+systemctl enable wifi-priority-monitor.service
+systemctl restart wifi-priority-monitor.service
+echo "[OK] Service started!"
+
+
+echo "DONE SUCCESS"
