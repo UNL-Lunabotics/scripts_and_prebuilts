@@ -25,7 +25,7 @@ CHECK_INTERVAL=60
 
 # Script needs to run as root
 if [ "$EUID" -ne 0 ]; then
-  echo "[ERROR] Please run this script as root: sudo bash setup-wifi-priority.sh"
+  echo "[ERROR] Please run this script as root (with sudo)."
   exit 1
 fi
 
