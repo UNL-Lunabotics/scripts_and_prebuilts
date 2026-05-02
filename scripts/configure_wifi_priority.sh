@@ -4,12 +4,12 @@
 # FILE:         configure_wifi_priority.sh
 # AUTHOR:       Ella Moody <moodyellam@gmail.com>
 # CREATED:      04-25-2026
-# LAST EDITED:  04-25-2026
+# LAST EDITED:  05-02-2026
 # DESCRIPTION:  This script is intended to 1. configure the wifi network priority of
-#               the onboard computer to prefer Team_## and eduroam second. Then, 2. 
-#               create a daemon that, if on eduroam, checks every interval to see
-#               if Team_## is available and connect to that instead. This script
-#               requires that the computer has already connected to both and has the
+#               the onboard computer to prefer Team_##, Team_##_5g, and then eduroam.
+#               Then, 2. create a daemon that, if on eduroam, checks every interval to see
+#               if Team_## is available and connect to that instead, then Team_##_5g.
+#               This script requires that the computer has already connected to both and has the
 #               user/password saved. This script will need to be manually edited and
 #               ran again if the SSID of the network changes.
 # USAGE:        sudo ./configure_wifi_priority.sh
@@ -20,7 +20,8 @@
 set -euo pipefail
 
 PRIMARY_SSID="Team_##"
-SECONDARY_SSID="eduroam"
+SECONDARY_SSID="Team_##_5g"
+TERTIARY_SSID="eduroam"
 CHECK_INTERVAL=60
 
 # Script needs to run as root
@@ -30,7 +31,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 
-# Part 1. update the NetworkManager priorities
+# update the NetworkManager priorities
 echo "[OK] Updating NetworkManager Priorities to favor team SSID..."
 if nmcli connection show | grep -q "$PRIMARY_SSID"; then
     nmcli connection modify "$PRIMARY_SSID" connection.autoconnect yes connection.autoconnect-priority 100
@@ -39,7 +40,21 @@ else
     echo "[WARNING] Connection profile for $PRIMARY_SSID not found. Please connect to it manually first."
 fi
 
+echo "[OK] Updating NetworkManager Priorities to favor secondary SSID..."
+if nmcli connection show | grep -q "$SECONDARY_SSID"; then
+    nmcli connection modify "$SECONDARY_SSID" connection.autoconnect yes connection.autoconnect-priority 99
+    echo "[OK] Set $SECONDARY_SSID priority to 99"
+else
+    echo "[WARNING] Connection profile for $SECONDARY_SSID not found. Please connect to it manually first."
+fi
 
+echo "[OK] Updating NetworkManager Priorities to favor tertiary SSID..."
+if nmcli connection show | grep -q "$TERTIARY_SSID"; then
+    nmcli connection modify "$TERTIARY_SSID" connection.autoconnect yes connection.autoconnect-priority 98
+    echo "[OK] Set $TERTIARY_SSID priority to 98"
+else
+    echo "[WARNING] Connection profile for $TERTIARY_SSID not found. Please connect to it manually first."
+fi
 
 # Part 2. write the daemon script that will run in the background
 echo "[OK] Creating the daemon script..."
@@ -51,6 +66,7 @@ cat << 'EOF' > "$MONITOR_SCRIPT"
 #!/bin/bash
 
 PRIMARY="REPLACE_PRIMARY"
+SECONDARY="REPLACE_SECONDARY"
 INTERVAL=REPLACE_INTERVAL
 
 while true; do
@@ -64,6 +80,15 @@ while true; do
             echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
             nmcli connection up "$PRIMARY"
         fi
+
+        # If we are not connected to the secondary network
+        if [ "$ACTIVE_CONNECTION" != "$SECONDARY" ]; then
+            # Force a Wi-Fi scan and check if the secondary network is in range
+            if nmcli -t -f ssid dev wifi list --rescan yes | grep -q "^${SECONDARY}$"; then
+                echo "$(date): $SECONDARY found! Switching from $ACTIVE_CONNECTION..."
+                nmcli connection up "$SECONDARY"
+            fi
+        fi
     fi
     sleep $INTERVAL
 done
@@ -71,6 +96,7 @@ EOF
 
 # Inject variables into the daemon script
 sed -i "s/REPLACE_PRIMARY/$PRIMARY_SSID/g" "$MONITOR_SCRIPT"
+sed -i "s/REPLACE_SECONDARY/$SECONDARY_SSID/g" "$MONITOR_SCRIPT"
 sed -i "s/REPLACE_INTERVAL/$CHECK_INTERVAL/g" "$MONITOR_SCRIPT"
 chmod +x "$MONITOR_SCRIPT"
 echo "[OK] Daemon script created at $MONITOR_SCRIPT"
