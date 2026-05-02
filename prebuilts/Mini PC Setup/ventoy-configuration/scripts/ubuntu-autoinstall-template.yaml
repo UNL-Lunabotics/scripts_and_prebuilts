@@ -1,0 +1,155 @@
+#cloud-config
+
+autoinstall:
+  version: 1
+ 
+  interactive-sections:
+    - network
+    
+    # If not using an SSD, or using multiple, uncomment this
+    # - storage
+
+  source:
+    id: ubuntu-desktop
+
+  # Set user with no password
+  identity:
+    username: workstation
+    hostname: ubuntu
+    password: "${PASS_HASH}"
+  
+  # Install packages
+  packages:
+    # Used for post-install
+    - cloud-init
+
+    # Dependencies/Common Programs
+    - ca-certificates
+    - curl
+    - evtest
+    - gnupg
+    - gnupg2
+    - joystick
+    - jstest-gtk
+    - libegl1-mesa-dev
+    - libglu1-mesa-dev
+    - libserial-dev
+    - libxtst6
+    - libxv1
+    - lsb-release
+    - software-properties-common
+    - usbutils
+    - wget
+
+    # Python3
+    - python3-venv
+    - bash-completion
+    - python3-argcomplete
+    - python-is-python3
+
+    # GitHub login
+    - gh
+
+    # Remote terminal
+    - ssh
+
+    # Adds dbus-launch; needed for changing gsettings through autoinstall
+    - dbus-x11
+  
+  # Post-install
+  user-data:
+    runcmd:
+      # Source ROS2 on terminal startup
+      - echo "\n# Source ROS2\nsource /opt/ros/${ROS_CODENAME}/setup.bash" >> /home/workstation/.bashrc
+
+      # Source Phoenix6
+      - echo "\n# Source Phoenix6\nexport LD_LIBRARY_PATH=/usr/lib/phoenix6/lib:$LD_LIBRARY_PATH" >> /home/workstation/.bashrc"
+
+      # Set dark mode by default
+      - sudo -u workstation dbus-launch gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+      
+      # Pin apps to dash
+      - sudo -u workstation dbus-launch gsettings set org.gnome.shell favorite-apps "['org.gnome.Terminal.desktop', 'code.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop']"
+    
+  late-commands:
+    # Install VSCode
+    - curtin in-target -- wget -O /tmp/vscode.deb "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-linux-deb-x64"
+    - curtin in-target -- dpkg -i /tmp/vscode.deb
+
+    # Install ROS2
+    - curtin in-target -- add-apt-repository universe
+    - curtin in-target -- curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.${UBUNTU_CODENAME}_all.deb"
+    - curtin in-target -- dpkg -i /tmp/ros2-apt-source.deb
+    - curtin in-target -- apt-get update && apt-get upgrade -y
+    - curtin in-target -- apt-get install -y ros-${ROS_CODENAME}-desktop
+
+    # Install PlatformIO
+    - curtin in-target -- apt-get update
+    - curtin in-target -- apt-get install -y pipx 
+    - curtin in-target -- pipx install platformio
+    - curtin in-target -- pipx ensurepath
+
+    # Install extra ROS2 packages
+    - curtin in-target -- apt-get update && apt-get upgrade -y
+
+    ## ROS 2 control stack
+    - >-
+      curtin in-target -- apt-get install -y
+      ros-${ROS_CODENAME}-ros2-control
+      ros-${ROS_CODENAME}-ros2-controllers
+      libserial-dev
+      ros-${ROS_CODENAME}-twist-mux
+    
+    ## ROS–Gazebo integration
+    - >-
+      curtin in-target -- apt-get install -y
+      ros-${ROS_CODENAME}-ros-gz
+      ros-${ROS_CODENAME}-gz-ros2-control
+      ros-${ROS_CODENAME}-xacro
+      ros-${ROS_CODENAME}-joint-state-publisher-gui
+      ros-${ROS_CODENAME}-robot-state-publisher
+      ros-${ROS_CODENAME}-foxglove-bridge
+    
+    ## Network package
+    - curtin in-target -- apt-get install -y ros-${ROS_CODENAME}-rmw-zenoh-cpp
+  
+    ## Hardware & Sensors
+    - >-
+      curtin in-target -- apt-get install -y
+      ros-${ROS_CODENAME}-joy
+      ros-${ROS_CODENAME}-joy-teleop
+      ros-${ROS_CODENAME}-realsense2-camera
+      ros-${ROS_CODENAME}-realsense2-description
+    
+    ## Autonomy & Navigation
+    - >-
+      curtin in-target -- apt-get install -y
+      ros-${ROS_CODENAME}-behaviortree-cpp
+      ros-${ROS_CODENAME}-navigation2
+      ros-${ROS_CODENAME}-nav2-bringup
+      ros-${ROS_CODENAME}-slam-toolbox
+      ros-${ROS_CODENAME}-robot-localization
+      ros-${ROS_CODENAME}-apriltag-ros
+    
+    ## MOLA SLAM
+    - >-
+      curtin in-target -- apt-get install -y
+      ros-${ROS_CODENAME}-mola
+      ros-${ROS_CODENAME}-mola-state-estimation
+      ros-${ROS_CODENAME}-mola-lidar-odometry
+
+    # Phoenix6
+    - curtin in-target -- curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg"
+    - curtin in-target -- curl -s --compressed -o /etc/apt/sources.list.d/ctr2026.list "https://deb.ctr-electronics.com/ctr2026.list"
+    - curtin in-target -- sed -i 's/signed-by=/arch=amd64 signed-by=/' /etc/apt/sources.list.d/ctr2026.list
+    - curtin in-target -- apt-get update
+    - curtin in-target -- apt-get install -y phoenix6
+
+    # Extra Python Tools
+    - curtin in-target -- apt-get install -y python3-colcon-common-extensions python3-rosdep python3-vcstool
+
+  storage:
+    layout:
+      name: default
+      match:
+        ssd: true

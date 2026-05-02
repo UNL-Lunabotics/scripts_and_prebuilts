@@ -1,0 +1,10 @@
+{
+    "auto_install":[
+        {
+            "image": "/isos/${ISO_NAME}",
+            "template":[
+                "/scripts/ubuntu-autoinstall.yaml"
+            ]
+        }
+    ]
+}
