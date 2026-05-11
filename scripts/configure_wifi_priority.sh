@@ -82,12 +82,13 @@ while true; do
         if nmcli -t -f ssid dev wifi list --rescan yes | grep -q "^${PRIMARY}$"; then
             echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
             nmcli connection up "$PRIMARY"
+            continue
         fi
 
         # If we are not connected to the secondary network
         if [ "$ACTIVE_CONNECTION" != "$SECONDARY" ]; then
             # Force a Wi-Fi scan and check if the secondary network is in range
-            if nmcli -t -f ssid dev wifi list --rescan yes | grep -q "^${SECONDARY}$"; then
+            if nmcli -t -f ssid dev wifi list | grep -q "^${SECONDARY}$"; then
                 echo "$(date): $SECONDARY found! Switching from $ACTIVE_CONNECTION..."
                 nmcli connection up "$SECONDARY"
             fi
