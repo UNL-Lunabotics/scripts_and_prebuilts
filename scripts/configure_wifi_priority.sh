@@ -35,6 +35,7 @@ fi
 echo "[OK] Updating NetworkManager Priorities to favor team SSID..."
 if nmcli connection show | grep -q "$PRIMARY_SSID"; then
     nmcli connection modify "$PRIMARY_SSID" connection.autoconnect yes connection.autoconnect-priority 100
+    nmcli connection modify "$PRIMARY_SSID" connection.interface-name "" 802-11-wireless.mac-address ""
     echo "[OK] Set $PRIMARY_SSID priority to 100"
 else
     echo "[WARNING] Connection profile for $PRIMARY_SSID not found. Please connect to it manually first."
@@ -43,6 +44,7 @@ fi
 echo "[OK] Updating NetworkManager Priorities to favor secondary SSID..."
 if nmcli connection show | grep -q "$SECONDARY_SSID"; then
     nmcli connection modify "$SECONDARY_SSID" connection.autoconnect yes connection.autoconnect-priority 99
+    nmcli connection modify "$SECONDARY_SSID" connection.interface-name "" 802-11-wireless.mac-address ""
     echo "[OK] Set $SECONDARY_SSID priority to 99"
 else
     echo "[WARNING] Connection profile for $SECONDARY_SSID not found. Please connect to it manually first."
@@ -51,6 +53,7 @@ fi
 echo "[OK] Updating NetworkManager Priorities to favor tertiary SSID..."
 if nmcli connection show | grep -q "$TERTIARY_SSID"; then
     nmcli connection modify "$TERTIARY_SSID" connection.autoconnect yes connection.autoconnect-priority 98
+    nmcli connection modify "$TERTIARY_SSID" connection.interface-name "" 802-11-wireless.mac-address ""
     echo "[OK] Set $TERTIARY_SSID priority to 98"
 else
     echo "[WARNING] Connection profile for $TERTIARY_SSID not found. Please connect to it manually first."
