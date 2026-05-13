@@ -19,8 +19,8 @@
 
 set -euo pipefail
 
-PRIMARY_SSID="Team_##"
-SECONDARY_SSID="Team_##_5g"
+PRIMARY_SSID="Team_37"
+SECONDARY_SSID="Team_37_5g"
 TERTIARY_SSID="eduroam"
 CHECK_INTERVAL=60
 
