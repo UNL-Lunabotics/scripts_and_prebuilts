@@ -4,14 +4,14 @@
 # FILE:         configure_wifi_priority.sh
 # AUTHOR:       Ella Moody <moodyellam@gmail.com>
 # CREATED:      04-25-2026
-# LAST EDITED:  05-02-2026
+# LAST EDITED:  05-10-2026
 # DESCRIPTION:  This script is intended to 1. configure the wifi network priority of
 #               the onboard computer to prefer Team_##, Team_##_5g, and then eduroam.
 #               Then, 2. create a daemon that, if on eduroam, checks every interval to see
 #               if Team_## is available and connect to that instead, then Team_##_5g.
 #               This script requires that the computer has already connected to both and has the
 #               user/password saved. This script will need to be manually edited and
-#               ran again if the SSID of the network changes.
+#               ran again if the SSID of the network changes. It also configs antenna.
 # USAGE:        sudo ./configure_wifi_priority.sh
 # DEPENDS:      bash, sudo
 # LICENSE:      Apache 2.0
@@ -22,7 +22,7 @@ set -euo pipefail
 PRIMARY_SSID="Team_37"
 SECONDARY_SSID="Team_37_5g"
 TERTIARY_SSID="eduroam"
-CHECK_INTERVAL=60
+CHECK_INTERVAL=30
 
 # Script needs to run as root
 if [ "$EUID" -ne 0 ]; then
@@ -94,6 +94,24 @@ while true; do
             fi
         fi
     fi
+
+    # Is the external antenna connected? If yes, connect to that and disable internal card. If no, use internal card
+    ANTENNA_SERIAL=$(nmcli device | grep wlx | cut -d " " -f1 | grep -v p2p)
+    if [[ -n $ANTENNA_SERIAL ]]; then
+        echo "entered yes antenna if"
+        ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        if [[ $ANTENNA_STATUS != "connecting" || $ANTENNA_STATUS != "connected" ]]; then
+            nmcli device set wlp3s0 managed no
+            systemctl stop tailscaled
+            nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
+        fi
+    else
+        if [ $(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3) == "unmanaged" ]; then
+            nmcli device set wlp3s0 managed yes
+            systemctl start tailscaled
+        fi
+    fi
+
     sleep $INTERVAL
 done
 EOF
