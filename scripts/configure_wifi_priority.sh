@@ -76,6 +76,23 @@ while true; do
     # Get the name of the currently active Wi-Fi connection
     ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1)
 
+    # Is the external antenna connected? If yes, connect to that and disable internal card. If no, use internal card
+    ANTENNA_SERIAL=$(nmcli device | grep wlx | cut -d " " -f1 | grep -v p2p)
+    if [[ -n $ANTENNA_SERIAL ]]; then
+        echo "entered yes antenna if"
+        ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        if [[ $ANTENNA_STATUS != "connecting" && $ANTENNA_STATUS != "connected" ]]; then
+            nmcli device set wlp3s0 managed no
+            systemctl stop tailscaled
+            nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
+        fi
+    else
+        if [ $(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3) == "unmanaged" ]; then
+            nmcli device set wlp3s0 managed yes
+            systemctl start tailscaled
+        fi
+    fi
+
     # If we are NOT connected to the primary network...
     if [ "$ACTIVE_CONNECTION" != "$PRIMARY" ]; then
         # Force a Wi-Fi scan and check if the primary network is in range
@@ -92,23 +109,6 @@ while true; do
                 echo "$(date): $SECONDARY found! Switching from $ACTIVE_CONNECTION..."
                 nmcli connection up "$SECONDARY"
             fi
-        fi
-    fi
-
-    # Is the external antenna connected? If yes, connect to that and disable internal card. If no, use internal card
-    ANTENNA_SERIAL=$(nmcli device | grep wlx | cut -d " " -f1 | grep -v p2p)
-    if [[ -n $ANTENNA_SERIAL ]]; then
-        echo "entered yes antenna if"
-        ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
-        if [[ $ANTENNA_STATUS != "connecting" && $ANTENNA_STATUS != "connected" ]]; then
-            nmcli device set wlp3s0 managed no
-            systemctl stop tailscaled
-            nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
-        fi
-    else
-        if [ $(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3) == "unmanaged" ]; then
-            nmcli device set wlp3s0 managed yes
-            systemctl start tailscaled
         fi
     fi
 
