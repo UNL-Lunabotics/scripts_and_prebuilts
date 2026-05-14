@@ -90,6 +90,7 @@ while true; do
         if [ $(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3) == "unmanaged" ]; then
             nmcli device set wlp3s0 managed yes
             systemctl start tailscaled
+            tailscale up
         fi
     fi
 
