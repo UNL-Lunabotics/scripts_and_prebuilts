@@ -79,7 +79,7 @@ while true; do
     # If we are NOT connected to the primary network...
     if [ "$ACTIVE_CONNECTION" != "$PRIMARY" ]; then
         # Force a Wi-Fi scan and check if the primary network is in range
-        if nmcli -t -f ssid dev wifi list --rescan yes | grep -q "^${PRIMARY}$"; then
+        if nmcli -t -f ssid dev wifi list | grep -q "^${PRIMARY}$"; then
             echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
             nmcli connection up "$PRIMARY"
             continue
@@ -100,7 +100,7 @@ while true; do
     if [[ -n $ANTENNA_SERIAL ]]; then
         echo "entered yes antenna if"
         ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
-        if [[ $ANTENNA_STATUS != "connecting" || $ANTENNA_STATUS != "connected" ]]; then
+        if [[ $ANTENNA_STATUS != "connecting" && $ANTENNA_STATUS != "connected" ]]; then
             nmcli device set wlp3s0 managed no
             systemctl stop tailscaled
             nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
