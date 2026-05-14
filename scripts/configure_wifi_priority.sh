@@ -82,6 +82,7 @@ while true; do
         echo "entered yes antenna if"
         ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
         if [[ $ANTENNA_STATUS != "connecting" && $ANTENNA_STATUS != "connected" ]]; then
+            tailscale down
             nmcli device set wlp3s0 managed no
             systemctl stop tailscaled
             nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
