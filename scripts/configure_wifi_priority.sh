@@ -74,29 +74,44 @@ INTERVAL=REPLACE_INTERVAL
 
 while true; do
     # Get the name of the currently active Wi-Fi connection
-    ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1)
+    ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1 | head -n 1)
 
-    # Is the external antenna connected? If yes, connect to that and disable internal card. If no, use internal card
+    # Is the external antenna connected? 
     ANTENNA_SERIAL=$(nmcli device | grep wlx | cut -d " " -f1 | grep -v p2p)
+    
     if [[ -n $ANTENNA_SERIAL ]]; then
-        echo "entered yes antenna if"
-        ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
-        if [[ $ANTENNA_STATUS != "connecting" && $ANTENNA_STATUS != "connected" ]]; then
-            tailscale down
+        # Always ensure internal card is disabled if antenna is present
+        INTERNAL_STATUS=$(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        if [[ "$INTERNAL_STATUS" != "unmanaged" ]]; then
+            echo "Antenna detected. Disabling internal Wi-Fi card..."
+            nmcli device disconnect wlp3s0 2>/dev/null || true
             nmcli device set wlp3s0 managed no
-            systemctl stop tailscaled
-            nmcli device wifi connect $ACTIVE_CONNECTION ifname $ANTENNA_SERIAL
+            systemctl stop tailscaled 2>/dev/null || true
+            tailscale down 2>/dev/null || true
+        fi
+
+        # If antenna is plugged in, ensure it is connected to the active network (swap with wifi card basically)
+        ANTENNA_STATUS=$(nmcli device | grep wlx | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        if [[ "$ANTENNA_STATUS" != "connecting" && "$ANTENNA_STATUS" != "connected" ]]; then
+            if [[ -n "$ACTIVE_CONNECTION" ]]; then
+                nmcli device wifi connect "$ACTIVE_CONNECTION" ifname "$ANTENNA_SERIAL"
+            else
+                nmcli connection up "$PRIMARY"
+            fi
         fi
     else
-        if [ $(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3) == "unmanaged" ]; then
+        # NO ANTENNA PRESENT. Ensure internal card is enabled and tailscale is up just in case
+        INTERNAL_STATUS=$(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        if [[ "$INTERNAL_STATUS" == "unmanaged" ]]; then
+            echo "No antenna detected. Enabling internal Wi-Fi card..."
             nmcli device set wlp3s0 managed yes
             systemctl start tailscaled
             tailscale up
         fi
     fi
 
-    # If we are NOT connected to the primary network...
-    if [ "$ACTIVE_CONNECTION" != "$PRIMARY" ]; then
+    # Ensure the program follows primary and secondary wifi priorities and connects to the highest priority available
+    if [[ "$ACTIVE_CONNECTION" != "$PRIMARY" && -n "$ACTIVE_CONNECTION" ]]; then
         # Force a Wi-Fi scan and check if the primary network is in range
         if nmcli -t -f ssid dev wifi list | grep -q "^${PRIMARY}$"; then
             echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
