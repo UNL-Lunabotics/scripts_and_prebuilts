@@ -107,9 +107,16 @@ while true; do
             nmcli device set wlp3s0 managed yes
             systemctl start tailscaled
             tailscale up
-            sleep 2
-            nmcli connection up "$PRIMARY" 2>/dev/null || true
+            sleep 3
         fi
+    fi
+
+    # We have to wait for the wifi card to refresh its network cash :)
+    ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1 | head -n 1)
+    if [[ -z "$ACTIVE_CONNECTION" ]]; then
+        echo "No active connection. Forcing a hardware scan..."
+        nmcli device wifi rescan 2>/dev/null || true
+        sleep 3 # Wait for the scan results to populate the cache
     fi
 
     # Ensure the program follows primary and secondary wifi priorities and connects to the highest priority available
