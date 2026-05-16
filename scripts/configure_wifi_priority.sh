@@ -105,6 +105,11 @@ while true; do
         if [[ "$INTERNAL_STATUS" == "unmanaged" ]]; then
             echo "No antenna detected. Enabling internal Wi-Fi card..."
             nmcli device set wlp3s0 managed yes
+            INTERNAL_STATUS=$(nmcli device | grep wlp3s0 | grep -v p2p | tr -s ' ' | cut -d " " -f3)
+        fi
+
+        if [[ "$INTERNAL_STATUS" == "disconnected" ]]; then
+            echo "Internal card is disconnected. Forcing connection..."
             nmcli device connect wlp3s0 2>/dev/null || true
             systemctl start tailscaled
             tailscale up
