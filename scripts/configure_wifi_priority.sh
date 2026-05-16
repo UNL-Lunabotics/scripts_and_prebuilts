@@ -4,7 +4,7 @@
 # FILE:         configure_wifi_priority.sh
 # AUTHOR:       Ella Moody <moodyellam@gmail.com>
 # CREATED:      04-25-2026
-# LAST EDITED:  05-10-2026
+# LAST EDITED:  05-16-2026
 # DESCRIPTION:  This script is intended to 1. configure the wifi network priority of
 #               the onboard computer to prefer Team_##, Team_##_5g, and then eduroam.
 #               Then, 2. create a daemon that, if on eduroam, checks every interval to see
@@ -105,18 +105,10 @@ while true; do
         if [[ "$INTERNAL_STATUS" == "unmanaged" ]]; then
             echo "No antenna detected. Enabling internal Wi-Fi card..."
             nmcli device set wlp3s0 managed yes
+            nmcli device connect wlp3s0 2>/dev/null || true
             systemctl start tailscaled
             tailscale up
-            sleep 3
         fi
-    fi
-
-    # We have to wait for the wifi card to refresh its network cash :)
-    ACTIVE_CONNECTION=$(nmcli -t -f NAME,TYPE connection show --active | grep 802-11-wireless | cut -d: -f1 | head -n 1)
-    if [[ -z "$ACTIVE_CONNECTION" ]]; then
-        echo "No active connection. Forcing a hardware scan..."
-        nmcli device wifi rescan 2>/dev/null || true
-        sleep 3 # Wait for the scan results to populate the cache
     fi
 
     # Ensure the program follows primary and secondary wifi priorities and connects to the highest priority available
