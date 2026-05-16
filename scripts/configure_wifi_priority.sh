@@ -107,11 +107,13 @@ while true; do
             nmcli device set wlp3s0 managed yes
             systemctl start tailscaled
             tailscale up
+            sleep 2
+            nmcli connection up "$PRIMARY" 2>/dev/null || true
         fi
     fi
 
     # Ensure the program follows primary and secondary wifi priorities and connects to the highest priority available
-    if [[ "$ACTIVE_CONNECTION" != "$PRIMARY" && -n "$ACTIVE_CONNECTION" ]]; then
+    if [[ "$ACTIVE_CONNECTION" != "$PRIMARY" ]]; then
         # Force a Wi-Fi scan and check if the primary network is in range
         if nmcli -t -f ssid dev wifi list | grep -q "^${PRIMARY}$"; then
             echo "$(date): $PRIMARY found! Switching from $ACTIVE_CONNECTION..."
