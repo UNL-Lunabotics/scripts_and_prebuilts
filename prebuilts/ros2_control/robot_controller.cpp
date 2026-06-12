@@ -6,6 +6,8 @@
 #include <pluginlib/class_list_macros.hpp>
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 
+// TODO: Ctrl+F and replace the word robot (turn off case sensitivity) with your robot name
+
 namespace robot_controller
 {
     controller_interface::InterfaceConfiguration RobotController::command_interface_configuration() const

@@ -18,6 +18,8 @@
 #include <atomic>
 #include "interfaces/srv/set_tibble_state.hpp"
 
+// TODO: Ctrl+F and replace the word robot (turn off case sensitivity) with your robot name
+
 namespace robot_controller
 {
     class RobotController : public controller_interface::ControllerInterface
