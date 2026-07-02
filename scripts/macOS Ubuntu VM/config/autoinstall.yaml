@@ -182,7 +182,7 @@ autoinstall:
     # Phoenix6
     - curtin in-target -- curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg"
     - curtin in-target -- curl -s --compressed -o /etc/apt/sources.list.d/ctr2026.list "https://deb.ctr-electronics.com/ctr2026.list"
-    - curtin in-target -- sed -i 's/signed-by=/arch=amd64 signed-by=/' /etc/apt/sources.list.d/ctr2026.list
+    - curtin in-target -- sed -i 's/signed-by=/arch=arm64 signed-by=/' /etc/apt/sources.list.d/ctr2026.list
     - curtin in-target -- apt-get update
     - curtin in-target -- apt-get install -y phoenix6
 
