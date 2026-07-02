@@ -1,14 +1,6 @@
 #cloud-config
 
 runcmd:
-  # Needed for Ubuntu 22.04 LTS for some reason
-  - [eval, subiquity.autoinstallpath/autoinstall.yaml]
-
-  - [eval, 'echo $(cat /proc/cmdline) "autoinstall" > /root/cmdline']
-  - [eval, 'mount -n --bind -o ro /root/cmdline /proc/cmdline']
-  - [eval, 'snap restart subiquity.subiquity-server']
-  - [eval, 'snap restart subiquity.subiquity-service']
-
   # Add this to force cloud-init to see this file
   - [eval, subiquity.autoinstallpath=/autoinstall.yaml]
 
