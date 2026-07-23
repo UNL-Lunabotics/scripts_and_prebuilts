@@ -1,0 +1,125 @@
+#cloud-config
+
+# -----------------------------------------------------------------------------
+# FILE:         autoinstall.yaml
+# AUTHOR:       Aiden Kimmerling <apkimmerling@gmail.com>
+# CREATED:      07-23-2026
+# LAST EDITED:  07-23-2026
+# DESCRIPTION:  Defines the Ubuntu install configuration. This file is used by
+#               build_vm.sh to fill in placeholders for variable configuration
+#               and should not be used by itself.
+# USAGE:        Used by build_vm.sh
+# DEPENDS:      build_vm.sh, Ubuntu Cloud Config
+# LICENSE:      Apache 2.0
+# -----------------------------------------------------------------------------
+
+autoinstall:
+  version: 1
+
+  # Start from Ubuntu Desktop without uneeded applications installed
+  source:
+    id: ubuntu-desktop-minimal
+
+  # macOS cannot natively create a secure password hash,
+  # so make user input a password before autoinstall triggers
+  interactive-sections:
+    - identity
+
+  # Set user with no password, since this section is interactive
+  identity:
+    realname: "${USERNAME}"
+    username: "${USERNAME}"
+    hostname: ubuntu
+    password: ""
+
+  # Add APT Sources
+  apt:
+    sources:
+      # VSCode Source
+      vscode.list:
+        source: "deb https://packages.microsoft.com/repos/code stable main"
+        key: |
+          ${VSCODE_KEY}
+  
+      # ROS2 Source
+      ros2.list:
+        source: "deb http://packages.ros.org/ros2/ubuntu ${UBUNTU_DISTRO} main"
+        key: |
+          ${ROS_KEY}
+
+  # Install packages
+  packages:
+    # Enable Clipboard Sharing
+    - spice-vdagent
+
+    # Dependencies
+    - ca-certificates
+    - software-properties-common
+    - curl
+    - dbus-x11
+    - pipx
+
+    # GitHub login
+    - gh
+
+    # VSCode
+    - code
+
+    # ROS2
+    ## Base Package
+    - ros-${ROS_DISTRO}-desktop
+
+    ${OPTIONAL_ROS_PACKAGES}
+
+    ## Extra Python Tools
+    - python3-colcon-common-extensions
+    - python3-rosdep
+    - python3-vcstool
+
+  user-data:
+    runcmd:
+      # Source ROS2 on terminal startup
+      - echo "\n# Source ROS2\nsource /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USERNAME}/.bashrc
+
+      # Set dark mode by default
+      - sudo -u ${USERNAME} dbus-launch gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+      
+      # Pin apps to dash
+      - sudo -u ${USERNAME} dbus-launch gsettings set org.gnome.shell favorite-apps "['zen.desktop', 'org.gnome.Terminal.desktop', 'code.desktop', 'org.gnome.Nautilus.desktop', 'org.gnome.Settings.desktop']"
+
+      # Add folders with the right permissions for Zen Install
+      - sudo -u ${USERNAME} dbus-run-session -- mkdir -p /home/${USERNAME}/.local/share/applications
+      - export HOME=/home/${USERNAME}
+
+      # Install Zen
+      - curl -fsSL https://updates.zen-browser.app/install.sh | bash
+
+  late-commands:
+    # Change display resolution in GRUB
+    - >-
+      curtin in-target --
+      sed -i /etc/default/grub -e
+      's/GRUB_CMDLINE_LINUX_DEFAULT=".*/GRUB_CMDLINE_LINUX_DEFAULT="console=tty0 video=${DISP_RES}@120"/'
+    - curtin in-target -- update-grub
+
+    # Install PlatformIO
+    - curtin in-target -- pipx install platformio
+    - curtin in-target -- pipx ensurepath
+
+    ## Install Phoenix6
+    - curtin in-target -- curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg"
+    - curtin in-target -- curl -s --compressed -o /etc/apt/sources.list.d/ctr2026.list "https://deb.ctr-electronics.com/ctr2026.list"
+    - curtin in-target -- sed -i 's/signed-by=/arch=arm64 signed-by=/' /etc/apt/sources.list.d/ctr2026.list
+    - curtin in-target -- apt-get update
+    - curtin in-target -- apt-get install -y phoenix6
+
+    ### Add Phoenix6 to LD Library Path
+    - curtin in-target -- sh -c 'echo "/usr/lib/phoenix6/lib" > /etc/ld.so.conf.d/phoenix6.conf'
+    - curtin in-target -- ldconfig
+
+    # Shutdown the virtual machine
+    - systemctl poweroff -i
+    
+  storage:
+    layout:
+      name: default
