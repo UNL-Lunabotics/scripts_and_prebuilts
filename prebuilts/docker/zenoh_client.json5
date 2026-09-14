@@ -4,7 +4,7 @@
   mode: "client",
   connect: {
     endpoints: [
-      /// Router is on localhost because both containers share host networking
+      /// This is just the default port
       "tcp/127.0.0.1:7447"
     ]
   }
