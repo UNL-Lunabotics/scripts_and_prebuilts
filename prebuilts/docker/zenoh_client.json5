@@ -1,0 +1,11 @@
+/// TODO, get rid of this if you aren't using wireless
+/// TODO, change the endpoints to what you actually need
+{
+  mode: "client",
+  connect: {
+    endpoints: [
+      /// Router is on localhost because both containers share host networking
+      "tcp/127.0.0.1:7447"
+    ]
+  }
+}

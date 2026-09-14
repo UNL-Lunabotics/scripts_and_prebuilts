@@ -1,0 +1,4 @@
+# TODO, MOVE THIS INTO YOUR REPOSITORY ROOT. It should not be in docker/
+# Ignore everything except package.xml files
+src/**
+!src/**/package.xml

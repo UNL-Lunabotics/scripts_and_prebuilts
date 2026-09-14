@@ -1,0 +1,48 @@
+# REQUIREMENTS:
+# 1. Share the same network as the host
+# 2. GPU access
+# 3. Display access
+# 4. Zenoh and no zenoh support
+# 5. Bind the repo 
+# 6. Support hotplugging USB input
+# 7. Read/write ability with serial microcontrollers
+# 8. Real time scheduling enabled
+
+services:
+  # Base configuration used by all profiles
+  ROBOTNAME_base:
+    build:
+      context: ..   # Because the dockerfile is not in the repository root, this is required to set the context one directory up (root)
+      dockerfile: docker/Dockerfile # Path to dockerfile from the root
+
+    network_mode: host              # Share the same network stack as the host which Fast DDS needs
+    ipc: host                       # Allows shared memory with host (/dev/shm) which Fast DDS needs
+    privileged: true                # Full access to host devices and kernel features (/dev, usb, input, udev)
+
+    tty: true         # Keeps interactive terminal open
+    stdin_open: true  # Keeps interactive terminal open
+
+    volumes:
+      - ..:/home/ubuntu/workspaces/REPONAME                # This repository binded as read/write
+      # You may be asking yourself why are we mounting udev, dev, and serial if this container is privileged?
+      # Great question, it's because making it privileged gives the container access to everything but the structure
+      # of the directories is not preserved or shared in full, so we need to explicitly bind them to make sure
+      # the program can find everything in the structure it expects and has access to everything (yes it's stupid)
+      - /run/udev:/run/udev:ro                    # Gives container access to udev metadata which helps identify USB devies (required for remote serial write)
+      - /dev/serial/by-id:/dev/serial/by-id:ro    # Binding this provides stable device naming (/dev/ttyUSB0 won't change)
+      - /dev:/dev                                 # Gives access to ALL devices (USB, input, cameras, etc)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw          # Shares X server socket which is required for GUI apps on Linux
+
+    cap_add:  # Add specific linux kernal capabilities to the container
+      - SYS_NICE      # For real-time scheduling, allows setting thread priority
+
+    group_add:    # Add the container to the following groups
+      - dialout   # dialout is for serial device access
+      - video     # video is for GPU/camera access
+      - input     # input is for gamepad
+
+    environment:
+      - DISPLAY=${DISPLAY}          # Tells the GUI apps where to render (current display)
+      - QT_X11_NO_MITSHM=1          # Prevents Qt crashes in containers
+      - ROS_DOMAIN_ID=0             # Explicitly sets the DDS domain
+      - QT_QPA_PLATFORM=xcb         # Forces X11 backend to avoid wayland compatibility issues

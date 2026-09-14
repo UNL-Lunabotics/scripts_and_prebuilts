@@ -1,0 +1,60 @@
+# REQUIREMENTS:
+# 1. Share the same network as the host
+# 2. GPU access
+# 3. Display access
+# 4. Zenoh and no zenoh support
+# 5. Bind the repo 
+# 6. Support hotplugging USB input
+# 7. Read/write ability with serial microcontrollers
+# 8. Real time scheduling enabled
+
+name: ROBOTNAME
+
+services:
+
+  # This service assumes you are only using one machine for development or using wired control
+  ROBOTNAME_wired:
+    extends:
+      file: compose-base.yaml
+      service: ROBOTNAME_base
+
+    container_name: ROBOTNAME_wired
+
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+    profiles:
+      - wired
+
+  # This service assumes you are using two machines requiring strict networking
+  # Enables Zenoh and runs a router on the host machine
+  # TODO, if you don't need wireless, just delete both these services. Otherwise, delete this comment
+  ROBOTNAME_wireless:
+    extends:
+      file: compose-base.yaml
+      service: ROBOTNAME_base
+
+    container_name: ROBOTNAME_wireless
+
+    environment:
+      - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+      - ZENOH_CONFIG=/docker/zenoh_client.json5
+    
+    depends_on:
+      - zenoh_router
+    
+    profiles:
+      - wireless
+
+  zenoh_router:
+    image: eclipse/zenoh
+    container_name: zenoh_router
+    network_mode: host
+    restart: unless-stopped
+
+    command:
+      - --listen
+      - tcp/0.0.0.0:${ZENOH_ROUTER_PORT:-7447}
+
+    profiles:
+      - wireless
